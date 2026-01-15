@@ -1,0 +1,141 @@
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const scoreEl = document.getElementById("score");
+const menu = document.getElementById("menu");
+
+const SIZE = 18;
+const TURN_SPEED = 0.12;
+
+let snake, food, dir, targetDir;
+let speed, maxSpeed, score, running;
+let color, headEmoji;
+let lastTime = 0;
+
+function startGame() {
+  menu.style.display = "none";
+
+  color = document.getElementById("color").value;
+  headEmoji = document.getElementById("head").value;
+
+  snake = [{ x: 300, y: 300 }];
+  dir = 0;
+  targetDir = 0;
+
+  speed = 120;        // px per second (slow & smooth)
+  maxSpeed = 260;     // hard cap
+  score = 0;
+  running = true;
+
+  spawnFood();
+  scoreEl.textContent = score;
+  lastTime = performance.now();
+
+  requestAnimationFrame(loop);
+}
+
+function spawnFood() {
+  food = {
+    x: Math.random() * (canvas.width - 60) + 30,
+    y: Math.random() * (canvas.height - 60) + 30,
+    r: 10
+  };
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowUp") targetDir = -Math.PI / 2;
+  if (e.key === "ArrowDown") targetDir = Math.PI / 2;
+  if (e.key === "ArrowLeft") targetDir = Math.PI;
+  if (e.key === "ArrowRight") targetDir = 0;
+});
+
+function loop(now) {
+  if (!running) return;
+
+  const delta = (now - lastTime) / 1000; // seconds
+  lastTime = now;
+
+  // Smooth turning
+  let diff = ((targetDir - dir + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+  dir += diff * TURN_SPEED;
+
+  const head = snake[0];
+  const moveDist = speed * delta;
+
+  const newHead = {
+    x: head.x + Math.cos(dir) * moveDist,
+    y: head.y + Math.sin(dir) * moveDist
+  };
+
+  snake.unshift(newHead);
+
+  // Food collision (perfect circle detection)
+  const dist = Math.hypot(newHead.x - food.x, newHead.y - food.y);
+  if (dist < SIZE + food.r) {
+    score++;
+    scoreEl.textContent = score;
+    spawnFood();
+
+    // Gentle speed increase
+    speed = Math.min(speed + 6, maxSpeed);
+  } else {
+    snake.pop();
+  }
+
+  // Wall collision
+  if (
+    newHead.x < SIZE || newHead.y < SIZE ||
+    newHead.x > canvas.width - SIZE ||
+    newHead.y > canvas.height - SIZE
+  ) return endGame();
+
+  // Self collision
+  for (let i = 12; i < snake.length; i++) {
+    if (Math.hypot(newHead.x - snake[i].x, newHead.y - snake[i].y) < SIZE) {
+      return endGame();
+    }
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Food
+  const g = ctx.createRadialGradient(food.x, food.y, 2, food.x, food.y, 14);
+  g.addColorStop(0, "#ffcccc");
+  g.addColorStop(1, "#ff0000");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(food.x, food.y, food.r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Snake body
+  for (let i = snake.length - 1; i > 0; i--) {
+    ctx.globalAlpha = 1 - i / snake.length;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(snake[i].x, snake[i].y, SIZE / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Rotated head
+  ctx.save();
+  ctx.translate(snake[0].x, snake[0].y);
+  ctx.rotate(dir);
+  ctx.font = "22px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(headEmoji, 0, 0);
+  ctx.restore();
+}
+
+function endGame() {
+  running = false;
+  menu.style.display = "flex";
+}
+</script>
